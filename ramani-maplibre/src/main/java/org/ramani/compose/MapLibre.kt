@@ -49,6 +49,7 @@ import org.maplibre.android.maps.MapLibreMap.OnMoveListener
 import org.maplibre.android.maps.MapLibreMap.OnRotateListener
 import org.maplibre.android.maps.MapLibreMap.OnScaleListener
 import org.maplibre.android.maps.MapLibreMap.OnShoveListener
+import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.layers.Layer
 import org.maplibre.android.style.sources.Source
@@ -89,8 +90,8 @@ annotation class MapLibreComposable
 @Composable
 fun MapLibre(
     modifier: Modifier,
-    styleBuilder: Style.Builder = Style.Builder()
-        .fromUri("https://demotiles.maplibre.org/style.json"),
+    styleBuilder: Style.Builder = Style.Builder().fromUri("https://demotiles.maplibre.org/style.json"),
+    map: MapView = rememberMapViewWithLifecycle(),
     cameraPosition: CameraPosition = rememberSaveable { CameraPosition() },
     uiSettings: UiSettings = UiSettings(),
     properties: MapProperties = MapProperties(),
@@ -113,7 +114,6 @@ fun MapLibre(
     }
 
     val context = LocalContext.current
-    val map = rememberMapViewWithLifecycle()
     val currentCameraPosition by rememberUpdatedState(cameraPosition)
     val currentUiSettings by rememberUpdatedState(uiSettings)
     val currentMapProperties by rememberUpdatedState(properties)
@@ -155,7 +155,7 @@ fun MapLibre(
                 onMapClick(latLng)
                 true
             }
-            
+
             maplibreMap.addOnMapLongClickListener { latLng ->
                 onMapLongClick(latLng)
                 true
