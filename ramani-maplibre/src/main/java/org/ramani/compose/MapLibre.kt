@@ -97,13 +97,15 @@ fun MapLibre(
     properties: MapProperties = MapProperties(),
     locationRequestProperties: LocationRequestProperties? = null,
     locationStyling: LocationStyling = LocationStyling(),
-    userLocation: MutableState<Location>? = null,
+    onNewLocation: ((Location) -> Unit)? =  null,
     sources: List<Source>? = null,
     layers: List<Layer>? = null,
     images: List<Pair<String, Int>>? = null,
     renderMode: Int = RenderMode.NORMAL,
     onMapClick: (LatLng) -> Unit = {},
     onMapLongClick: (LatLng) -> Unit = {},
+    onMapZoom: (StandardScaleGestureDetector) -> Unit = {},
+    onMapMove: (MoveGestureDetector) -> Unit = {},
     content: (@Composable @MapLibreComposable () -> Unit)? = null,
 ) {
     if (LocalInspectionMode.current) {
@@ -142,7 +144,7 @@ fun MapLibre(
                 style,
                 currentLocationRequestProperties,
                 currentLocationStyling,
-                userLocation,
+                onNewLocation,
                 renderMode,
             )
             maplibreMap.addImages(context, currentImages)
@@ -158,6 +160,40 @@ fun MapLibre(
                 onMapLongClick(latLng)
                 true
             }
+
+            maplibreMap.addOnMoveListener(
+                object : OnMoveListener {
+                    override fun onMoveBegin(detector: MoveGestureDetector) {
+                        onMapMove(detector)
+                    }
+
+                    override fun onMove(detector: MoveGestureDetector) {
+                        onMapMove(detector)
+                    }
+
+                    override fun onMoveEnd(detector: MoveGestureDetector) {
+                        onMapMove(detector)
+                    }
+
+                }
+            )
+
+            maplibreMap.addOnScaleListener(
+                object : OnScaleListener {
+                    override fun onScaleBegin(detector: StandardScaleGestureDetector) {
+                        onMapZoom(detector)
+                    }
+
+                    override fun onScale(detector: StandardScaleGestureDetector) {
+                        onMapZoom(detector)
+                    }
+
+                    override fun onScaleEnd(detector: StandardScaleGestureDetector) {
+                        onMapZoom(detector)
+                    }
+
+                }
+            )
 
             map.newComposition(parentComposition, style) {
                 CompositionLocalProvider {
@@ -213,6 +249,34 @@ private fun MapLibreMap.setupLocation(
     this.locationComponent.renderMode = renderMode
 }
 
+private fun MapLibreMap.setupLocation(
+    context: Context,
+    style: Style,
+    locationRequestProperties: LocationRequestProperties?,
+    locationStyling: LocationStyling,
+    onNewLocation: ((Location) -> Unit)?,
+    renderMode: Int
+) {
+    if (locationRequestProperties == null) return
+
+    val locationEngineRequest = locationRequestProperties.toMapLibre()
+    val locationActivationOptions = LocationComponentActivationOptions
+        .builder(context, style)
+        .locationComponentOptions(locationStyling.toMapLibre(context))
+        .useDefaultLocationEngine(true)
+        .locationEngineRequest(locationEngineRequest)
+        .build()
+    this.locationComponent.activateLocationComponent(locationActivationOptions)
+
+    if (isFineLocationGranted(context) || isCoarseLocationGranted(context)) {
+        @SuppressLint("MissingPermission")
+        this.locationComponent.isLocationComponentEnabled = true
+        onNewLocation?.let { trackLocation(context, locationEngineRequest, it) }
+    }
+
+    this.locationComponent.renderMode = renderMode
+}
+
 private fun isFineLocationGranted(context: Context): Boolean {
     return context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
 }
@@ -235,6 +299,30 @@ private fun trackLocation(
         object : LocationEngineCallback<LocationEngineResult> {
             override fun onSuccess(result: LocationEngineResult?) {
                 result?.lastLocation?.let { userLocation.value = it }
+            }
+
+            override fun onFailure(exception: Exception) {
+                throw exception
+            }
+        },
+        null
+    )
+}
+
+@SuppressLint("MissingPermission")
+private fun trackLocation(
+    context: Context,
+    locationEngineRequest: LocationEngineRequest,
+    onNewLocation: ((Location) -> Unit)
+) {
+    assert(isFineLocationGranted(context) || isCoarseLocationGranted(context))
+
+    val locationEngine = LocationEngineDefault.getDefaultLocationEngine(context)
+    locationEngine.requestLocationUpdates(
+        locationEngineRequest,
+        object : LocationEngineCallback<LocationEngineResult> {
+            override fun onSuccess(result: LocationEngineResult?) {
+                result?.lastLocation?.let { onNewLocation(it) }
             }
 
             override fun onFailure(exception: Exception) {
