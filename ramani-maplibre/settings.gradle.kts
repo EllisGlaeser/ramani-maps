@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ramani-maplibre-fork"
+rootProject.name = "ramani-maplibre"
 
